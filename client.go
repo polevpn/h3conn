@@ -16,9 +16,9 @@ type Client struct {
 	RoundTripper *http3.RoundTripper
 }
 
-func NewClient(verifySSL bool) *Client {
+func NewClient(tlsConfig *tls.Config) *Client {
 	client := &Client{
-		RoundTripper: &http3.RoundTripper{TLSClientConfig: &tls.Config{InsecureSkipVerify: verifySSL}},
+		RoundTripper: &http3.RoundTripper{TLSClientConfig: tlsConfig},
 	}
 	return client
 }
