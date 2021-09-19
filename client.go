@@ -1,6 +1,7 @@
 package h3conn
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"io"
@@ -22,11 +23,15 @@ type Client struct {
 
 // Connect establishes a full duplex communication with an HTTP2 server with custom client.
 // See h2conn.Connect documentation for more info.
-func (c *Client) Connect(urlStr string) (*Conn, *http.Response, error) {
+func (c *Client) Connect(urlStr string, timeout time.Duration) (*Conn, *http.Response, error) {
 	reader, writer := io.Pipe()
 
 	// Create a request object to send to the server
-	req, err := http.NewRequest(http.MethodPost, urlStr, reader)
+
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, reader)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -41,12 +46,19 @@ func (c *Client) Connect(urlStr string) (*Conn, *http.Response, error) {
 	if httpClient == nil {
 		httpClient = defaultClient.Client
 	}
+	timer := time.NewTimer(timeout)
+
+	go func() {
+		<-timer.C
+		cancel()
+	}()
 
 	// Perform the request
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, nil, err
 	}
+	timer.Stop()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, resp, errors.New("h3 handshake fail,code=" + strconv.Itoa(resp.StatusCode))
@@ -60,10 +72,9 @@ func (c *Client) Connect(urlStr string) (*Conn, *http.Response, error) {
 var defaultClient = Client{
 	Client: &http.Client{
 		Transport: &http3.RoundTripper{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
-		Timeout:   time.Second * 5,
 	},
 }
 
-func Connect(urlStr string) (*Conn, *http.Response, error) {
-	return defaultClient.Connect(urlStr)
+func Connect(urlStr string, timeout time.Duration) (*Conn, *http.Response, error) {
+	return defaultClient.Connect(urlStr, timeout)
 }
