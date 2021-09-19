@@ -23,7 +23,7 @@ func NewClient(tlsConfig *tls.Config) *Client {
 	return client
 }
 
-func (c *Client) Connect(urlStr string, timeout time.Duration) (*Conn, *http.Response, error) {
+func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Header) (*Conn, *http.Response, error) {
 	reader, writer := io.Pipe()
 	// Create a request object to send to the server
 	ctx := context.Background()
@@ -33,6 +33,8 @@ func (c *Client) Connect(urlStr string, timeout time.Duration) (*Conn, *http.Res
 	if err != nil {
 		return nil, nil, err
 	}
+
+	req.Header = header
 
 	timer := time.NewTimer(timeout)
 
@@ -62,5 +64,5 @@ var defaultClient = Client{
 }
 
 func Connect(urlStr string, timeout time.Duration) (*Conn, *http.Response, error) {
-	return defaultClient.Connect(urlStr, timeout)
+	return defaultClient.Connect(urlStr, timeout, nil)
 }
