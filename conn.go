@@ -18,7 +18,7 @@ type Conn struct {
 	rLock      sync.Mutex
 }
 
-func newConn(remoteAddr net.Addr, localAddr net.Addr, r io.Reader, w io.WriteCloser) *Conn {
+func newConn(remoteAddr net.Addr, localAddr net.Addr, r io.ReadCloser, w io.WriteCloser) *Conn {
 	return &Conn{
 		remoteAddr: remoteAddr,
 		localAddr:  localAddr,
