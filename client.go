@@ -53,6 +53,7 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 	if resp.StatusCode != http.StatusOK {
 		return nil, resp, errors.New("h3 handshake fail,code=" + strconv.Itoa(resp.StatusCode))
 	}
+	resp.Body.Close()
 	// Create a connection
 	conn := newConn(nil, nil, resp.Body, writer)
 

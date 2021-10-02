@@ -12,7 +12,7 @@ import (
 type Conn struct {
 	remoteAddr net.Addr
 	localAddr  net.Addr
-	r          io.Reader
+	r          io.ReadCloser
 	w          io.WriteCloser
 	wLock      sync.Mutex
 	rLock      sync.Mutex
