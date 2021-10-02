@@ -61,5 +61,6 @@ func (c *Conn) RemoteAddr() net.Addr {
 
 // Close closes the connection
 func (c *Conn) Close() error {
+	c.r.Close()
 	return c.w.Close()
 }
