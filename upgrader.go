@@ -3,11 +3,9 @@ package h3conn
 import (
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 
-	"github.com/lucas-clemente/quic-go"
-	"github.com/lucas-clemente/quic-go/http3"
+	"github.com/quic-go/quic-go/http3"
 )
 
 var ErrHTTP3NotSupported = fmt.Errorf("HTTP3 not supported")
@@ -28,25 +26,21 @@ func (u *Upgrader) Accept(w http.ResponseWriter, r *http.Request) (*Conn, error)
 		return nil, ErrHTTP3NotSupported
 	}
 
-	stream, ok := w.(http3.DataStreamer)
+	hijack, ok := w.(http3.Hijacker)
 
 	if !ok {
 		return nil, ErrHTTP3NotSupported
 	}
 
-	laddr := r.Context().Value(http.LocalAddrContextKey)
+	laddr := hijack.Connection().LocalAddr()
 
 	if laddr == nil {
 		return nil, ErrHTTP3GetAddr
 	}
 
-	raddr, err := net.ResolveUDPAddr("udp", r.RemoteAddr)
+	raddr := hijack.Connection().RemoteAddr()
 
-	if err != nil {
-		return nil, ErrHTTP3GetAddr
-	}
-
-	c := newConn(raddr, laddr.(net.Addr), r.Body, &flushWrite{w: w, f: flusher, s: stream.DataStream()})
+	c := newConn(raddr, laddr, r.Body, &flushWrite{w: w, f: flusher, c: hijack.Connection()})
 
 	w.WriteHeader(u.StatusCode)
 
@@ -66,7 +60,7 @@ func Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 type flushWrite struct {
 	w io.Writer
 	f http.Flusher
-	s quic.Stream
+	c http3.Connection
 }
 
 func (fw *flushWrite) Write(data []byte) (int, error) {
@@ -76,5 +70,5 @@ func (fw *flushWrite) Write(data []byte) (int, error) {
 }
 
 func (fw *flushWrite) Close() error {
-	return fw.s.Close()
+	return fw.c.CloseWithError(0, "closed")
 }

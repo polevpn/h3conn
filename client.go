@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/lucas-clemente/quic-go/http3"
+	"github.com/quic-go/quic-go/http3"
 )
 
 type Client struct {
@@ -31,6 +31,7 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, reader)
 	if err != nil {
+		cancel()
 		return nil, nil, err
 	}
 
