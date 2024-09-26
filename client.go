@@ -65,6 +65,7 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 		cancel()
 		return nil, nil, err
 	}
+
 	transport := &quic.Transport{Conn: udpConn}
 
 	dial := func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (quic.EarlyConnection, error) {
@@ -81,6 +82,8 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 		cancel()
 		return nil, nil, err
 	}
+
+	c.tlsConfig.NextProtos = []string{"h3"}
 
 	qconn, err := dial(ctx, host, c.tlsConfig, nil)
 
