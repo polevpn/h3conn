@@ -85,7 +85,7 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 
 	c.tlsConfig.NextProtos = []string{"h3"}
 
-	qconn, err := dial(ctx, host, c.tlsConfig, nil)
+	qconn, err := dial(ctx, host, c.tlsConfig, &quic.Config{KeepAlivePeriod: time.Second * 10, MaxIdleTimeout: time.Hour * 24})
 
 	if err != nil {
 		cancel()
