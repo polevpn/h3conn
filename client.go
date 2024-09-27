@@ -83,6 +83,13 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 		return nil, nil, err
 	}
 
+	timer := time.NewTimer(timeout)
+
+	go func() {
+		<-timer.C
+		cancel()
+	}()
+
 	c.tlsConfig.NextProtos = []string{"h3"}
 
 	qconn, err := dial(ctx, host, c.tlsConfig, &quic.Config{KeepAlivePeriod: time.Second * 10, MaxIdleTimeout: time.Hour * 24})
@@ -103,13 +110,6 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 	}
 
 	req.Header = header
-
-	timer := time.NewTimer(timeout)
-
-	go func() {
-		<-timer.C
-		cancel()
-	}()
 
 	// Perform the request
 	resp, err := rt.RoundTrip(req)
