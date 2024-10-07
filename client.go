@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/quic-go/quic-go"
@@ -54,8 +54,6 @@ func (c *Client) getHost(urlStr string) (string, error) {
 
 func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Header) (*Conn, *http.Response, error) {
 
-	reader, writer := io.Pipe()
-	// Create a request object to send to the server
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -99,11 +97,22 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 		return nil, nil, err
 	}
 
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	var stream quic.Stream = nil
+
 	rt := &http3.SingleDestinationRoundTripper{
 		Connection: qconn,
+		StreamHijacker: func(ft http3.FrameType, cti quic.ConnectionTracingID, s quic.Stream, err error) (bool, error) {
+
+			stream = s
+			wg.Done()
+			return true, nil
+		},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, reader)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, strings.NewReader("hello"))
+
 	if err != nil {
 		cancel()
 		return nil, nil, err
@@ -121,8 +130,11 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 	if resp.StatusCode != http.StatusOK {
 		return nil, resp, errors.New("h3 handshake fail,code=" + strconv.Itoa(resp.StatusCode))
 	}
+
+	wg.Wait()
+
 	// Create a connection
-	conn := newConn(qconn.RemoteAddr(), qconn.LocalAddr(), resp.Body, writer)
+	conn := newConn(qconn.RemoteAddr(), qconn.LocalAddr(), stream)
 
 	return conn, resp, nil
 }

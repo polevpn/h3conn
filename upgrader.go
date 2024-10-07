@@ -2,7 +2,6 @@ package h3conn
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/quic-go/quic-go/http3"
@@ -10,6 +9,7 @@ import (
 
 var ErrHTTP3NotSupported = fmt.Errorf("HTTP3 not supported")
 var ErrHTTP3GetAddr = fmt.Errorf("HTTP3 get addr fail")
+var ErrHTTP3Create = fmt.Errorf("HTTP3 create stream fail")
 
 type Upgrader struct {
 	StatusCode int
@@ -18,11 +18,6 @@ type Upgrader struct {
 func (u *Upgrader) Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 
 	if !r.ProtoAtLeast(3, 0) {
-		return nil, ErrHTTP3NotSupported
-	}
-	flusher, ok := w.(http.Flusher)
-
-	if !ok {
 		return nil, ErrHTTP3NotSupported
 	}
 
@@ -40,11 +35,21 @@ func (u *Upgrader) Accept(w http.ResponseWriter, r *http.Request) (*Conn, error)
 
 	raddr := hijack.Connection().RemoteAddr()
 
-	c := newConn(raddr, laddr, r.Body, &flushWrite{w: w, f: flusher, c: hijack.Connection()})
+	stream, err := hijack.Connection().OpenStream()
+
+	if err != nil {
+		return nil, ErrHTTP3Create
+	}
+
+	_, err = stream.Write([]byte("h3"))
+
+	if err != nil {
+		return nil, ErrHTTP3Create
+	}
+
+	c := newConn(raddr, laddr, stream)
 
 	w.WriteHeader(u.StatusCode)
-
-	flusher.Flush()
 
 	return c, nil
 }
@@ -55,20 +60,4 @@ var defaultUpgrader = Upgrader{
 
 func Accept(w http.ResponseWriter, r *http.Request) (*Conn, error) {
 	return defaultUpgrader.Accept(w, r)
-}
-
-type flushWrite struct {
-	w io.Writer
-	f http.Flusher
-	c http3.Connection
-}
-
-func (fw *flushWrite) Write(data []byte) (int, error) {
-	n, err := fw.w.Write(data)
-	fw.f.Flush()
-	return n, err
-}
-
-func (fw *flushWrite) Close() error {
-	return fw.c.CloseWithError(0, "closed")
 }

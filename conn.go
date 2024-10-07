@@ -1,9 +1,9 @@
 package h3conn
 
 import (
-	"io"
 	"net"
-	"sync"
+
+	"github.com/quic-go/quic-go"
 )
 
 // Conn is client/server symmetric connection.
@@ -12,33 +12,25 @@ import (
 type Conn struct {
 	remoteAddr net.Addr
 	localAddr  net.Addr
-	r          io.ReadCloser
-	w          io.WriteCloser
-	wLock      sync.Mutex
-	rLock      sync.Mutex
+	conn       quic.Stream
 }
 
-func newConn(remoteAddr net.Addr, localAddr net.Addr, r io.ReadCloser, w io.WriteCloser) *Conn {
+func newConn(remoteAddr net.Addr, localAddr net.Addr, conn quic.Stream) *Conn {
 	return &Conn{
 		remoteAddr: remoteAddr,
 		localAddr:  localAddr,
-		r:          r,
-		w:          w,
+		conn:       conn,
 	}
 }
 
 // Write writes data to the connection
 func (c *Conn) Write(data []byte) (int, error) {
-	c.wLock.Lock()
-	defer c.wLock.Unlock()
-	return c.w.Write(data)
+	return c.conn.Write(data)
 }
 
 // Read reads data from the connection
 func (c *Conn) Read(data []byte) (int, error) {
-	c.rLock.Lock()
-	defer c.rLock.Unlock()
-	return c.r.Read(data)
+	return c.conn.Read(data)
 }
 
 // LocalAddr returns the local network address.
@@ -61,6 +53,5 @@ func (c *Conn) RemoteAddr() net.Addr {
 
 // Close closes the connection
 func (c *Conn) Close() error {
-	c.r.Close()
-	return c.w.Close()
+	return c.conn.Close()
 }
