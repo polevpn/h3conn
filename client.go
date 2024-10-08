@@ -81,11 +81,15 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 		return nil, nil, err
 	}
 
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
 	timer := time.NewTimer(timeout)
 
 	go func() {
 		<-timer.C
 		cancel()
+		wg.Done()
 	}()
 
 	c.tlsConfig.NextProtos = []string{"h3"}
@@ -97,8 +101,6 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 		return nil, nil, err
 	}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
 	var stream quic.Stream = nil
 
 	rt := &http3.SingleDestinationRoundTripper{
@@ -125,7 +127,6 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 	if err != nil {
 		return nil, nil, err
 	}
-	timer.Stop()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, resp, errors.New("h3 handshake fail,code=" + strconv.Itoa(resp.StatusCode))
@@ -133,6 +134,11 @@ func (c *Client) Connect(urlStr string, timeout time.Duration, header http.Heade
 
 	wg.Wait()
 
+	timer.Stop()
+
+	if stream == nil {
+		return nil, resp, errors.New("h3 create stream fail,timeout")
+	}
 	// Create a connection
 	conn := newConn(qconn.RemoteAddr(), qconn.LocalAddr(), stream)
 
